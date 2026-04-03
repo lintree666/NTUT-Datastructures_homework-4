@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HW3-1 智能派單 (Smart Enqueue) 視覺化</title>
+    <title>HW3-1 智能派單 - 手動操作版</title>
     <style>
         :root {
             --bg-color: #1e1e2e;
@@ -55,6 +55,53 @@
             color: var(--gold);
         }
 
+        .action-panel {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .action-panel h3 {
+            margin-top: 0;
+            color: var(--warning);
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: 0.2s;
+            background-color: #44475a;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover { background-color: #6272a4; transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+
+        .btn-skip { background-color: #8be9fd; color: #282a36; }
+        .btn-skip:hover { background-color: #a4ffff; }
+        
+        .btn-reset { background-color: var(--error); color: white; margin-left: auto; }
+        .btn-reset:hover { background-color: #ff6e6e; }
+
         .factory-container {
             display: flex;
             justify-content: space-around;
@@ -99,7 +146,7 @@
             align-items: center;
             justify-content: center;
             font-size: 32px;
-            animation: popIn 0.3s ease-out;
+            animation: popIn 0.2s ease-out;
             position: relative;
         }
 
@@ -113,41 +160,11 @@
             100% { transform: scale(1); }
         }
 
-        .controls {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-        }
-
-        button {
-            padding: 10px 20px;
-            font-size: 18px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        #startBtn {
-            background-color: var(--success);
-            color: #282a36;
-        }
-
-        #startBtn:hover { background-color: #40c963; }
-
-        #resetBtn {
-            background-color: var(--error);
-            color: white;
-        }
-
-        #resetBtn:hover { background-color: #d14646; }
-
         .log-container {
             background-color: var(--panel-bg);
             width: 100%;
             max-width: 800px;
-            height: 250px;
+            height: 200px;
             border-radius: 10px;
             padding: 15px;
             overflow-y: auto;
@@ -166,12 +183,7 @@
 </head>
 <body>
 
-    <h1>🏰 HW3-1 智能派單視覺化系統</h1>
-
-    <div class="controls">
-        <button id="startBtn" onclick="toggleSimulation()">開始自動執行</button>
-        <button id="resetBtn" onclick="resetSimulation()">重製</button>
-    </div>
+    <h1>🏰 HW3-1 手動派單系統</h1>
 
     <div class="dashboard">
         <div class="status-panel">
@@ -180,7 +192,19 @@
         </div>
         <div class="status-panel">
             <h3>當前進度</h3>
-            <div style="font-size: 24px; font-weight: bold;" id="roundDisplay">第 0 回合</div>
+            <div style="font-size: 24px; font-weight: bold;" id="roundDisplay">準備開始</div>
+        </div>
+    </div>
+
+    <div class="action-panel">
+        <h3>下達指令</h3>
+        <div class="button-group">
+            <button onclick="playTurn('劍士')">⚔️ 劍士 ($20)</button>
+            <button onclick="playTurn('弓手')">🏹 弓手 ($30)</button>
+            <button onclick="playTurn('騎士')">🐎 騎士 ($50)</button>
+            <button onclick="playTurn('投石車')">🪨 投石車 ($40)</button>
+            <button class="btn-skip" onclick="playTurn(null)">⏳ 跳過本回合</button>
+            <button class="btn-reset" onclick="resetGame()">🔄 重置遊戲</button>
         </div>
     </div>
 
@@ -196,7 +220,7 @@
     </div>
 
     <div class="log-container" id="logBox">
-        <div style="color: gray;">系統初始化完畢，等待指令...</div>
+        <div style="color: gray;">系統初始化完畢，請點擊上方按鈕下達指令...</div>
     </div>
 
     <script>
@@ -206,15 +230,14 @@
         let barracks_A = [];
         let barracks_B = [];
         let round_num = 0;
-        let simulationInterval = null;
 
-        // 訂單資料 (加入 Emoji 素材)
-        const orders = [
-            {unit: "劍士", cost: 20, emoji: "⚔️"},
-            {unit: "弓手", cost: 30, emoji: "🏹"},
-            {unit: "騎士", cost: 50, emoji: "🐎"},
-            {unit: "投石車", cost: 40, emoji: "🪨"}
-        ];
+        // 兵種價目表與素材
+        const unitData = {
+            "劍士": { cost: 20, emoji: "⚔️" },
+            "弓手": { cost: 30, emoji: "🏹" },
+            "騎士": { cost: 50, emoji: "🐎" },
+            "投石車": { cost: 40, emoji: "🪨" }
+        };
 
         // 取得 DOM 元素
         const goldDisplay = document.getElementById('goldDisplay');
@@ -222,44 +245,35 @@
         const queueA = document.getElementById('queueA');
         const queueB = document.getElementById('queueB');
         const logBox = document.getElementById('logBox');
-        const startBtn = document.getElementById('startBtn');
 
         function log(msg, type = '') {
             const div = document.createElement('div');
             div.className = `log-entry ${type}`;
             div.innerText = msg;
             logBox.appendChild(div);
-            logBox.scrollTop = logBox.scrollHeight; // 自動滾動到最底部
+            logBox.scrollTop = logBox.scrollHeight;
         }
 
         function renderQueues() {
             goldDisplay.innerText = `💰 ${player_gold}`;
             roundDisplay.innerText = `第 ${round_num} 回合`;
 
-            // 渲染 A 廠
             queueA.innerHTML = '';
             barracks_A.forEach(item => {
                 queueA.innerHTML += `<div class="unit">${item.emoji}<span>${item.unit}</span></div>`;
             });
 
-            // 渲染 B 廠
             queueB.innerHTML = '';
             barracks_B.forEach(item => {
                 queueB.innerHTML += `<div class="unit">${item.emoji}<span>${item.unit}</span></div>`;
             });
         }
 
-        function processNextRound() {
-            if (round_num >= orders.length) {
-                log("--- 所有訂單處理完畢，停止模擬 ---", "log-header");
-                toggleSimulation(true); // 強制停止
-                return;
-            }
-
-            let order = orders[round_num];
+        // 玩家點擊按鈕觸發回合
+        function playTurn(selectedUnitName) {
             log(`\n--- 第 ${round_num} 回合 ---`, "log-header");
 
-            // 1. Dequeue 階段
+            // 1. Dequeue 階段：偶數回合出列
             if (round_num % 2 === 0) {
                 if (barracks_A.length > 0) {
                     let finished = barracks_A.shift();
@@ -276,71 +290,56 @@
                 }
             }
 
-            // 更新畫面 (顯示出列結果)
-            renderQueues();
+            // 2. Enqueue 階段：處理玩家的新訂單
+            if (selectedUnitName === null) {
+                log("玩家本回合無動作，單純推進時間", "log-info");
+            } else {
+                let unitInfo = unitData[selectedUnitName];
+                let unit = selectedUnitName;
+                let cost = unitInfo.cost;
 
-            // 2. Enqueue 階段
-            setTimeout(() => {
-                if (!order || Object.keys(order).length === 0) {
-                    log("玩家本回合無動作，單純推進時間", "log-info");
+                if (player_gold < cost) {
+                    log(`黃金不足，無法生產 ${unit}`, "log-error");
                 } else {
-                    let unit = order.unit;
-                    let cost = order.cost;
-
-                    if (player_gold < cost) {
-                        log(`黃金不足，無法生產 ${unit}`, "log-error");
+                    // Overflow 防禦
+                    if (barracks_A.length >= 2 && barracks_B.length >= 2) {
+                        log(`產線全滿！${unit} 訂單拒絕`, "log-error");
                     } else {
-                        if (barracks_A.length >= 2 && barracks_B.length >= 2) {
-                            log(`產線全滿！${unit} 訂單拒絕`, "log-error");
+                        player_gold -= cost;
+                        // 負載平衡邏輯
+                        if (barracks_A.length <= barracks_B.length && barracks_A.length < 2) {
+                            barracks_A.push({ unit: unit, emoji: unitInfo.emoji });
+                            log(`${unit} 分派至 A 廠 (剩餘黃金: ${player_gold})`, "log-success");
                         } else {
-                            player_gold -= cost;
-                            if (barracks_A.length <= barracks_B.length && barracks_A.length < 2) {
-                                barracks_A.push(order);
-                                log(`${unit} 分派至 A 廠 (剩餘黃金: ${player_gold})`, "log-success");
-                            } else {
-                                barracks_B.push(order);
-                                log(`${unit} 分派至 B 廠 (剩餘黃金: ${player_gold})`, "log-success");
-                            }
+                            barracks_B.push({ unit: unit, emoji: unitInfo.emoji });
+                            log(`${unit} 分派至 B 廠 (剩餘黃金: ${player_gold})`, "log-success");
                         }
                     }
                 }
-                
-                let aNames = barracks_A.map(u => `'${u.unit}'`);
-                let bNames = barracks_B.map(u => `'${u.unit}'`);
-                log(`A: [${aNames.join(', ')}] | B: [${bNames.join(', ')}]`, "log-info");
-                
-                renderQueues();
-                round_num++;
-            }, 800); // 延遲 0.8 秒處理訂單，讓視覺上有先出列再排隊的感覺
-        }
-
-        function toggleSimulation(forceStop = false) {
-            if (simulationInterval || forceStop) {
-                clearInterval(simulationInterval);
-                simulationInterval = null;
-                startBtn.innerText = "開始自動執行";
-                startBtn.style.backgroundColor = "var(--success)";
-            } else {
-                if (round_num >= orders.length) return; // 如果已經結束就不執行
-                startBtn.innerText = "暫停執行";
-                startBtn.style.backgroundColor = "var(--warning)";
-                processNextRound(); // 馬上執行第一步
-                simulationInterval = setInterval(processNextRound, 2000); // 每 2 秒跑一回合
             }
+
+            // 更新內部資料與畫面
+            let aNames = barracks_A.map(u => `'${u.unit}'`);
+            let bNames = barracks_B.map(u => `'${u.unit}'`);
+            log(`A: [${aNames.join(', ')}] | B: [${bNames.join(', ')}]`, "log-info");
+            
+            renderQueues();
+            round_num++; // 回合結束，推進時間
         }
 
-        function resetSimulation() {
-            toggleSimulation(true);
+        function resetGame() {
             player_gold = initialGold;
             barracks_A = [];
             barracks_B = [];
             round_num = 0;
-            logBox.innerHTML = '<div style="color: gray;">系統初始化完畢，等待指令...</div>';
+            logBox.innerHTML = '<div style="color: gray;">遊戲已重置，請點擊上方按鈕下達指令...</div>';
             renderQueues();
+            roundDisplay.innerText = `準備開始`;
         }
 
-        // 初始化第一次渲染
+        // 初始化
         renderQueues();
+        roundDisplay.innerText = `準備開始`;
     </script>
 </body>
 </html>
